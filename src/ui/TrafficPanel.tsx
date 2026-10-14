@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { edgeCost, minAllowedDistance, TRAFFIC_LEVELS, type GraphEdge, type GraphNode, type TrafficLevel } from '../core/graph';
 import { mapStore, useMapStore } from '../state/mapStore';
 import { TurnEditor } from './TurnEditor';
+import { Panel } from './Panel';
 
 const LEVELS: readonly TrafficLevel[] = [1, 2, 3, 4];
 
@@ -17,34 +18,35 @@ export function TrafficPanel() {
   const node = useMapStore((s) => (s.selection?.kind === 'node' ? s.nodes.get(s.selection.id) : undefined));
 
   return (
-    <section className="panel">
-      <h2>Traffic</h2>
-      <ul className="legend">
-        {LEVELS.map((level) => (
-          <li key={level}>
-            <button
-              className={`legend-row${brush === level ? ' active' : ''}`}
-              onClick={() => {
-                mapStore.getState().setTrafficBrush(level);
-                mapStore.getState().setTool('traffic');
-              }}
-            >
-              <span className="swatch" style={{ background: TRAFFIC_LEVELS[level].color }} />
-              <span>{TRAFFIC_LEVELS[level].label}</span>
-              <span className="muted">×{TRAFFIC_LEVELS[level].multiplier.toFixed(1)}</span>
-            </button>
+    <>
+      <Panel id="traffic" title="Traffic">
+        <ul className="legend">
+          {LEVELS.map((level) => (
+            <li key={level}>
+              <button
+                className={`legend-row${brush === level ? ' active' : ''}`}
+                onClick={() => {
+                  mapStore.getState().setTrafficBrush(level);
+                  mapStore.getState().setTool('traffic');
+                }}
+              >
+                <span className="swatch" style={{ background: TRAFFIC_LEVELS[level].color }} />
+                <span>{TRAFFIC_LEVELS[level].label}</span>
+                <span className="muted">×{TRAFFIC_LEVELS[level].multiplier.toFixed(1)}</span>
+              </button>
+            </li>
+          ))}
+          <li className="legend-row static">
+            <span className="swatch closed" />
+            <span>Closed</span>
+            <span className="muted">skipped</span>
           </li>
-        ))}
-        <li className="legend-row static">
-          <span className="swatch closed" />
-          <span>Closed</span>
-          <span className="muted">skipped</span>
-        </li>
-      </ul>
-
-      <h2>Selection</h2>
-      {edge ? <RoadInspector edge={edge} /> : node ? <NodeInspector node={node} /> : <p className="muted">{selection ? 'Selected item no longer exists.' : 'Nothing selected. Click a road or intersection with the Select tool.'}</p>}
-    </section>
+        </ul>
+      </Panel>
+      <Panel id="selection" title="Selection">
+        {edge ? <RoadInspector edge={edge} /> : node ? <NodeInspector node={node} /> : <p className="muted">{selection ? 'Selected item no longer exists.' : 'Nothing selected. Click a road or intersection with the Select tool, or use Find on the map.'}</p>}
+      </Panel>
+    </>
   );
 }
 

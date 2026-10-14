@@ -101,7 +101,20 @@ The 10,000-node map is slightly faster than the 2,500-node one because at that z
 | S / E | Start / End | Places the A / B pin |
 | W | Stop | Adds or removes an intermediate stop (waypoint) |
 
-Wheel zooms around the cursor. Dragging empty space (or right/middle drag) pans. Other keys: **L** toggles labels, **F** fits the map to the view, **Esc** cancels, **Delete** removes the selection.
+Other keys: **L** toggles labels, **Esc** cancels, **Delete** removes the selection, **P** shows or hides the side panels.
+
+### Moving around the map
+
+| With | Pan | Zoom | Other |
+|---|---|---|---|
+| Mouse | Drag empty space (or right/middle drag) | Wheel, around the cursor | |
+| Touch | One finger | Two-finger pinch (the map follows your fingers) | |
+| Keyboard | Arrow keys (Shift: bigger steps) | **+** / **−** | **F** fits the map, **Z** zooms to the route, **/** jumps to Find |
+| On screen | | **+** / **−** buttons (bottom right) | Fit map, zoom to route |
+
+- **Find** (top left of the map): type an intersection id or label. Matches are ranked exact id, then id prefix, then label. Enter or a click centres the map on the intersection, selects it and pulses it. Each result also has **A** / **B** / **+** buttons to make it the start, the destination or a stop.
+- **Panels:** every sidebar section (Route, Traffic, Selection, Map, Network) collapses from its heading, and so does the comparison table at the bottom. **Panels** (P) hides the sidebar to give the map the full width. These choices are remembered in the browser (`localStorage`).
+- **Zoom to route** frames the route with its pins and stops, and never zooms in closer than 3×. Focusing an intersection zooms in to at least 1.4× if the view is further out.
 
 ### Route display (`state/routeStore.ts`, `state/routeController.ts`, `ui/routeAnimation.ts`)
 
@@ -318,7 +331,7 @@ Tested on the shared correctness suite, and through 60 random sequences of 25 ed
 
 #### Tests
 
-316 tests across 20 files (229 before Phase 10). New: `turns`, `dstarLite`, `kShortest` and `serialization`, plus additions to the generator, store, engine, client and controller suites.
+316 tests across 20 files (229 before Phase 10). The navigation work later added `navigation.test.ts`, which brings the total to 325 in 21 files. New: `turns`, `dstarLite`, `kShortest` and `serialization`, plus additions to the generator, store, engine, client and controller suites.
 
 The UI was smoke-tested in headless Edge with no console errors:
 - algorithm switching;

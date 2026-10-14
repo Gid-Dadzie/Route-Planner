@@ -13,6 +13,7 @@ import { routeController } from '../state/appRoute';
 import { DEFAULT_COMPARE_REPEATS } from '../state/routeController';
 import { useMapStore } from '../state/mapStore';
 import { routeStore, useRouteStore } from '../state/routeStore';
+import { uiStore, useUiStore } from '../state/uiStore';
 import type { CompareEntry } from '../worker/protocol';
 
 const fmt = (n: number, digits = 1) => n.toLocaleString(undefined, { maximumFractionDigits: digits });
@@ -28,6 +29,7 @@ export function ComparisonPanel() {
   const end = useMapStore((s) => s.end);
   const version = useMapStore((s) => s.version);
   const r = routeStore.getState();
+  const open = useUiStore((s) => s.comparisonOpen);
 
   const results = comparison?.results ?? [];
   const agreement = checkAgreement(results);
@@ -43,9 +45,16 @@ export function ComparisonPanel() {
   };
 
   return (
-    <section className="comparison" aria-labelledby="comparison-title">
+    <section className={`comparison${open ? '' : ' collapsed'}`} aria-labelledby="comparison-title">
       <div className="comparison-head">
-        <h2 id="comparison-title">Algorithm comparison</h2>
+        <h2 id="comparison-title">
+          <button className="panel-toggle" aria-expanded={open} aria-controls="comparison-body" onClick={uiStore.getState().toggleComparison} title="Show or hide the comparison table">
+            <span className="chevron" aria-hidden="true">
+              ▸
+            </span>
+            Algorithm comparison
+          </button>
+        </h2>
         <AgreementBadge agreement={agreement} hasResults={results.length > 0} />
         {running && <span className="badge">Running…</span>}
         {stale && !running && <span className="badge muted-badge">Out of date</span>}
@@ -62,7 +71,7 @@ export function ComparisonPanel() {
         </div>
       </div>
 
-      {!start || !end ? (
+      {!open ? null : !start || !end ? (
         <p className="muted">Place a start and a destination to compare the algorithms.</p>
       ) : comparison?.status === 'error' ? (
         <p className="note error">{comparison.error}</p>

@@ -6,6 +6,7 @@
 import { useEffect } from 'react';
 import { TRAFFIC_LEVELS, type TrafficLevel } from '../core/graph';
 import { mapStore, useMapStore, type Tool } from '../state/mapStore';
+import { uiStore, useUiStore } from '../state/uiStore';
 import { demoMap } from '../utils/mapGenerator';
 
 interface ToolDef {
@@ -35,7 +36,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 }
 
-/** Global shortcuts: tool keys, 1-4 traffic brush, Esc, Delete, L labels, F fit. */
+/** Global shortcuts: tool keys, 1-4 traffic brush, Esc, Delete, L labels, F fit, P panels. Map panning and zooming keys live in MapCanvas. */
 function useShortcuts(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -57,6 +58,8 @@ function useShortcuts(): void {
         s.toggleLabels();
       } else if (key === 'F') {
         s.requestFit();
+      } else if (key === 'P') {
+        uiStore.getState().toggleSidebar();
       } else {
         return;
       }
@@ -74,6 +77,7 @@ export function Toolbar() {
   const showLabels = useMapStore((s) => s.showLabels);
   const nodeCount = useMapStore((s) => s.nodes.size);
   const roadCount = useMapStore((s) => s.edges.size);
+  const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const { setTool, setTrafficBrush, toggleLabels, requestFit, loadNetwork, clearMap } = mapStore.getState();
 
   const loadDemo = () => {
@@ -129,6 +133,14 @@ export function Toolbar() {
         </button>
         <button className="tool-btn" onClick={requestFit} title="Fit map to view (F)">
           Fit<kbd>F</kbd>
+        </button>
+        <button
+          className={`tool-btn${sidebarOpen ? ' active' : ''}`}
+          onClick={uiStore.getState().toggleSidebar}
+          title="Show or hide the side panels (P)"
+          aria-pressed={sidebarOpen}
+        >
+          Panels<kbd>P</kbd>
         </button>
         <button className="tool-btn" onClick={loadDemo}>Demo map</button>
         <button className="tool-btn danger" onClick={confirmClear}>Clear</button>

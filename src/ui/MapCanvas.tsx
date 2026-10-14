@@ -10,6 +10,13 @@
  * is handled by the active tool; a larger move pans the view, or drags the node
  * under the pointer when the Select or Move tool is active. Right/middle drag
  * always pans. The wheel zooms around the cursor.
+ *
+ * Other ways to navigate, so the map works without a mouse wheel:
+ * - touch: one finger pans (or drags a node), two fingers pinch-zoom and pan;
+ * - on-screen controls: zoom in, zoom out, fit the map, zoom to the route;
+ * - keyboard: arrows pan (Shift for bigger steps), + / - zoom, Z zooms to the
+ *   route, F fits the map, / focuses the Find box;
+ * - Find: jump to an intersection by id or label (it is selected and pulses).
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -17,10 +24,12 @@ import { mapStore, useMapStore, type MapState, type Selection } from '../state/m
 import { routeStore, useRouteStore } from '../state/routeStore';
 import { SpatialIndex } from '../utils/spatialIndex';
 import { alternativeLayers } from './alternatives';
+import { FindIntersection } from './FindIntersection';
+import { MapControls } from './MapControls';
 import { loadMapFile } from './mapFiles';
 import { nodeRadiusPx, renderMap, type MapView, type RenderOverlay, type RouteLayer } from './renderMap';
 import { animationFrameAt, finalFrame } from './routeAnimation';
-import { fitBounds, screenToWorld, zoomAt, type Viewport } from './viewport';
+import { boundsOf, centerOn, fitBounds, panBy, pinchStep, screenToWorld, zoomAt, zoomCentered, type ScreenPoint, type Viewport } from './viewport';
 
 const DRAG_THRESHOLD_PX = 4;
 /** Extra pick tolerance around nodes, in screen pixels. */
@@ -33,6 +42,15 @@ const EDGE_PICK_PX = 6;
  * garbage-collection stalls that halve the frame rate.
  */
 const DRAG_COMMIT_MS = 100;
+/** Zoom factor of one button press or + / - key press. */
+const ZOOM_STEP = 1.4;
+/** Arrow-key pan step in screen pixels (Shift: three times as far). */
+const PAN_STEP_PX = 80;
+/** Zooming to a route or an intersection never goes closer than this. */
+const FOCUS_MAX_SCALE = 3;
+/** Focusing an intersection zooms in to at least this scale. */
+const FOCUS_MIN_SCALE = 1.4;
+const PULSE_MS = 1400;
 
 type Interaction =
   | { mode: 'idle' }
@@ -40,7 +58,9 @@ type Interaction =
   | { mode: 'pressed'; button: number; startX: number; startY: number; lastX: number; lastY: number; hit: Selection | null }
   | { mode: 'pan'; lastX: number; lastY: number }
   /** Dragging a node: drawn at (x, y) every frame, committed to the store every DRAG_COMMIT_MS and on release. */
-  | { mode: 'dragNode'; id: string; grabDx: number; grabDy: number; startX: number; startY: number; moved: boolean; x: number; y: number; lastCommit: number };
+  | { mode: 'dragNode'; id: string; grabDx: number; grabDy: number; startX: number; startY: number; moved: boolean; x: number; y: number; lastCommit: number }
+  /** Two fingers down: pinch-zoom and pan. Ends without a click when either lifts. */
+  | { mode: 'pinch' };
 
 /**
  * The map as the renderer should see it: the store's state, except that a
@@ -70,6 +90,10 @@ function withDraggedNode(s: MapState, drag: RenderOverlay['drag']): MapView {
   };
 }
 
+function isTypingTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+}
+
 const TOOL_HINTS: Record<MapState['tool'], string> = {
   select: 'Click to inspect a road or intersection. Drag to pan, drag a node to move it.',
   addNode: 'Click empty space to add an intersection.',
@@ -89,7 +113,12 @@ export function MapCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<Viewport>({ scale: 1, ox: 0, oy: 0, width: 0, height: 0 });
-  const overlayRef = useRef<RenderOverlay>({ hover: null, cursor: null, route: null, drag: null, isolated: [], alternatives: [] });
+  const overlayRef = useRef<RenderOverlay>({ hover: null, cursor: null, route: null, drag: null, isolated: [], alternatives: [], pulse: null });
+  /** Active pointers (for pinch), by pointer id, in canvas coordinates. */
+  const pointersRef = useRef(new Map<number, ScreenPoint>());
+  /** Intersection pulsing after Find / focus, with the time it started. */
+  const pulseRef = useRef<{ id: string; start: number } | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const interactionRef = useRef<Interaction>({ mode: 'idle' });
   const dirtyRef = useRef(true);
   const indexRef = useRef<{ nodes: MapState['nodes']; edges: MapState['edges']; index: SpatialIndex } | null>(null);
@@ -98,6 +127,7 @@ export function MapCanvas() {
   const pendingRoadFrom = useMapStore((s) => s.pendingRoadFrom);
   const isEmpty = useMapStore((s) => s.nodes.size === 0);
   const slow = useRouteStore((s) => s.slow);
+  const hasRoute = useRouteStore((s) => s.result?.found === true);
   const [dropActive, setDropActive] = useState(false);
   const [dropMessage, setDropMessage] = useState<string | null>(null);
 
@@ -145,6 +175,38 @@ export function MapCanvas() {
       // 56px padding leaves room for the pins above the top-most nodes.
       fitBounds(v, { minX, minY, maxX, maxY }, 56);
     }
+    markDirty();
+  };
+
+  // ---- View commands (controls, keyboard, focus requests) ---------------------
+
+  const zoomBy = (factor: number) => {
+    zoomCentered(viewRef.current, factor);
+    markDirty();
+  };
+
+  /** Frames the route with its pins and stops (or just the pins if there is no route). */
+  const zoomToRoute = () => {
+    const s = mapStore.getState();
+    const r = routeStore.getState();
+    const ids = [...(r.result?.found ? r.result.path : []), s.start ?? '', s.end ?? '', ...s.waypoints];
+    const points = ids.map((id) => s.nodes.get(id)).filter((n): n is NonNullable<typeof n> => n !== undefined);
+    const b = boundsOf(points);
+    if (!b) return;
+    const v = viewRef.current;
+    // 70px padding keeps the pins (drawn above their intersection) on screen.
+    fitBounds(v, b, 70);
+    if (v.scale > FOCUS_MAX_SCALE) centerOn(v, (b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, FOCUS_MAX_SCALE);
+    markDirty();
+  };
+
+  /** Centres an intersection, zooming in if the view is far out, and pulses it. */
+  const focusNode = (id: string) => {
+    const n = mapStore.getState().nodes.get(id);
+    if (!n) return;
+    const v = viewRef.current;
+    centerOn(v, n.x, n.y, Math.min(FOCUS_MAX_SCALE, Math.max(v.scale, FOCUS_MIN_SCALE)));
+    pulseRef.current = { id, start: performance.now() };
     markDirty();
   };
 
@@ -222,7 +284,7 @@ export function MapCanvas() {
     const mode = interactionRef.current.mode;
     const t = mapStore.getState().tool;
     canvas.style.cursor =
-      mode === 'pan' || mode === 'dragNode'
+      mode === 'pan' || mode === 'dragNode' || mode === 'pinch'
         ? 'grabbing'
         : hit
           ? 'pointer'
@@ -301,9 +363,17 @@ export function MapCanvas() {
 
     let raf = 0;
     const frame = (now: number) => {
-      // Keep redrawing every frame while the animation is playing.
-      if (dirtyRef.current || animStart !== null) {
+      const pulse = pulseRef.current;
+      const pulsing = pulse !== null && now - pulse.start < PULSE_MS;
+      if (pulse && !pulsing) {
+        pulseRef.current = null;
+        overlayRef.current.pulse = null;
+        dirtyRef.current = true;
+      }
+      // Keep redrawing every frame while the animation or the pulse is playing.
+      if (dirtyRef.current || animStart !== null || pulsing) {
         dirtyRef.current = false;
+        overlayRef.current.pulse = pulse && pulsing ? { id: pulse.id, t: (now - pulse.start) / PULSE_MS } : null;
         overlayRef.current.route = routeLayer(now);
         overlayRef.current.isolated = routeStore.getState().network?.isolated ?? [];
         overlayRef.current.alternatives = alternativeLayers(mapStore.getState(), routeStore.getState());
@@ -319,10 +389,17 @@ export function MapCanvas() {
     });
 
     let lastFit = mapStore.getState().fitRequest;
+    let lastFocus = mapStore.getState().focusRequest?.seq ?? 0;
     const unsubscribe = mapStore.subscribe((s) => {
       if (s.fitRequest !== lastFit) {
         lastFit = s.fitRequest;
         fitToMap();
+      }
+      if (s.focusRequest && s.focusRequest.seq !== lastFocus) {
+        lastFocus = s.focusRequest.seq;
+        const target = s.focusRequest.target;
+        if (target.type === 'route') zoomToRoute();
+        else focusNode(target.id);
       }
       // Drop hover if the hovered item was deleted.
       const hover = overlayRef.current.hover;
@@ -342,12 +419,54 @@ export function MapCanvas() {
     };
     canvas.addEventListener('wheel', onWheel, { passive: false });
 
+    // Keyboard navigation. Tool shortcuts live in the toolbar; these move the view.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
+      const step = PAN_STEP_PX * (e.shiftKey ? 3 : 1);
+      const v = viewRef.current;
+      switch (e.key) {
+        case 'ArrowLeft':
+          panBy(v, step, 0);
+          break;
+        case 'ArrowRight':
+          panBy(v, -step, 0);
+          break;
+        case 'ArrowUp':
+          panBy(v, 0, step);
+          break;
+        case 'ArrowDown':
+          panBy(v, 0, -step);
+          break;
+        case '+':
+        case '=':
+          zoomCentered(v, ZOOM_STEP);
+          break;
+        case '-':
+        case '_':
+          zoomCentered(v, 1 / ZOOM_STEP);
+          break;
+        case 'z':
+        case 'Z':
+          zoomToRoute();
+          break;
+        case '/':
+          searchRef.current?.focus();
+          break;
+        default:
+          return;
+      }
+      e.preventDefault();
+      markDirty();
+    };
+    window.addEventListener('keydown', onKey);
+
     return () => {
       cancelAnimationFrame(raf);
       observer.disconnect();
       unsubscribe();
       unsubscribeRoute();
       canvas.removeEventListener('wheel', onWheel);
+      window.removeEventListener('keydown', onKey);
     };
   }, []);
 
@@ -358,9 +477,25 @@ export function MapCanvas() {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
+  /** The first two active pointers (for pinch). */
+  const twoPointers = (): [ScreenPoint, ScreenPoint] | null => {
+    const it = pointersRef.current.values();
+    const a = it.next().value;
+    const b = it.next().value;
+    return a && b ? [a, b] : null;
+  };
+
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     const p = localPoint(e);
+    pointersRef.current.set(e.pointerId, p);
+    if (pointersRef.current.size >= 2) {
+      // A second finger: whatever the first one started becomes a pinch.
+      finishDrag();
+      interactionRef.current = { mode: 'pinch' };
+      updateCursor(null);
+      return;
+    }
     const hit = hitTest(p.x, p.y);
     const s = mapStore.getState();
 
@@ -391,6 +526,18 @@ export function MapCanvas() {
     const v = viewRef.current;
     const it = interactionRef.current;
     overlayRef.current.cursor = screenToWorld(v, p.x, p.y);
+
+    if (it.mode === 'pinch') {
+      const before = twoPointers();
+      if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, p);
+      const after = twoPointers();
+      if (before && after) {
+        pinchStep(v, before[0], before[1], after[0], after[1]);
+        markDirty();
+      }
+      return;
+    }
+    if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, p);
 
     if (it.mode === 'dragNode') {
       if (!it.moved && Math.hypot(p.x - it.startX, p.y - it.startY) < DRAG_THRESHOLD_PX) return;
@@ -444,6 +591,12 @@ export function MapCanvas() {
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    pointersRef.current.delete(e.pointerId);
+    if (interactionRef.current.mode === 'pinch') {
+      // Lifting a finger ends the pinch; the other finger does nothing until it lifts too.
+      if (pointersRef.current.size < 2) interactionRef.current = { mode: 'idle' };
+      return;
+    }
     finishDrag();
     const it = interactionRef.current;
     interactionRef.current = { mode: 'idle' };
@@ -498,13 +651,22 @@ export function MapCanvas() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={() => {
+        onPointerCancel={(e) => {
+          pointersRef.current.delete(e.pointerId);
           finishDrag();
           interactionRef.current = { mode: 'idle' };
         }}
         onPointerLeave={onPointerLeave}
         onContextMenu={(e) => e.preventDefault()}
         aria-label="Road network map"
+      />
+      <FindIntersection inputRef={searchRef} />
+      <MapControls
+        onZoomIn={() => zoomBy(ZOOM_STEP)}
+        onZoomOut={() => zoomBy(1 / ZOOM_STEP)}
+        onFit={fitToMap}
+        onRoute={zoomToRoute}
+        hasRoute={hasRoute}
       />
       {slow && (
         <div className="map-busy" role="status">

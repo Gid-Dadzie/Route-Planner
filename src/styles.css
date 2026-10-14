@@ -1050,3 +1050,190 @@ button:disabled {
   font-size: 13px;
   cursor: pointer;
 }
+
+/* ---- Navigation: collapsible panels, map controls, find ------------------- */
+
+.app.no-sidebar {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'toolbar'
+    'map'
+    'comparison';
+}
+
+.panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+}
+
+.panel-toggle:hover {
+  color: var(--text);
+}
+
+.chevron {
+  display: inline-block;
+  font-size: 10px;
+  transform: rotate(90deg);
+  transition: transform 0.15s ease;
+}
+
+.panel-toggle[aria-expanded='false'] .chevron {
+  transform: none;
+}
+
+.panel.collapsed h2 {
+  margin-bottom: 0;
+}
+
+.comparison.collapsed {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.comparison.collapsed .comparison-head {
+  margin-bottom: 0;
+}
+
+/* Zoom controls (bottom-right of the map) */
+
+.map-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(17, 26, 46, 0.92);
+}
+
+.map-controls button {
+  display: grid;
+  place-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.map-controls button:last-child {
+  border-bottom: 0;
+}
+
+.map-controls button:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.map-controls svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.map-controls circle {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* Keep the tool hint clear of the zoom controls. */
+.map-hint {
+  max-width: calc(100% - 84px);
+}
+
+/* Find box (top-left of the map) */
+
+.map-find {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: min(300px, calc(100% - 24px));
+  z-index: 2;
+}
+
+.map-find input {
+  background: rgba(11, 18, 32, 0.94);
+  padding: 7px 10px;
+}
+
+.find-results {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.find-results li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.find-results li.active {
+  background: var(--surface-2);
+}
+
+.find-results li.find-empty {
+  cursor: default;
+}
+
+.find-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.find-flag {
+  color: var(--danger);
+  font-size: 11px;
+}
+
+.find-actions {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+
+.find-actions .pin {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.find-actions .pin:hover {
+  outline: 2px solid var(--text);
+}
+
+/* Larger touch targets on touch screens. */
+@media (pointer: coarse) {
+  .map-controls button {
+    width: 44px;
+    height: 44px;
+  }
+}

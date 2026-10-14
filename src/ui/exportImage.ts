@@ -65,7 +65,7 @@ export function renderRouteImage(): HTMLCanvasElement {
     v,
     SCALE,
     { ...s, selection: null, pendingRoadFrom: null },
-    { hover: null, cursor: null, drag: null, isolated: [], route, alternatives: alternativeLayers(s, r) },
+    { hover: null, cursor: null, drag: null, isolated: [], route, alternatives: alternativeLayers(s, r), pulse: null },
   );
 
   drawCaption(ctx, captionLines());

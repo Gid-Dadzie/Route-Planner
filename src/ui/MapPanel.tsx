@@ -9,6 +9,7 @@ import { generateMap, MAP_SIZES, type MapKind } from '../utils/mapGenerator';
 import { TRAFFIC_PRESETS } from '../utils/trafficPresets';
 import { exportRouteImage } from './exportImage';
 import { loadMapFile, saveMapFile } from './mapFiles';
+import { Panel } from './Panel';
 
 type Message = { text: string; tone: 'ok' | 'error' } | null;
 
@@ -71,8 +72,7 @@ export function MapPanel() {
   };
 
   return (
-    <section className="panel">
-      <h2>Map</h2>
+    <Panel id="map" title="Map">
 
       <div className="field">
         <span>Generate</span>
@@ -147,6 +147,6 @@ export function MapPanel() {
           {message.text}
         </p>
       )}
-    </section>
+    </Panel>
   );
 }

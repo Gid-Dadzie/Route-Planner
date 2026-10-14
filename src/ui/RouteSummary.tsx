@@ -13,6 +13,7 @@ import { MAX_WAYPOINTS, mapStore, useMapStore } from '../state/mapStore';
 import { routeStore, useRouteStore, type RouteMeta } from '../state/routeStore';
 import { alternativeColor, currentAlternatives, sharedDistance } from './alternatives';
 import { ROUTE_COLORS } from './renderMap';
+import { Panel } from './Panel';
 
 export function RouteSummary() {
   const start = useMapStore((s) => s.start);
@@ -43,10 +44,7 @@ export function RouteSummary() {
     (resultAlgorithm === 'astar' && resultHeuristic ? ` · ${getHeuristic(resultHeuristic).label}` : '');
 
   return (
-    <section className="panel">
-      <h2>
-        Route{slow && <span className="badge">Recalculating…</span>}
-      </h2>
+    <Panel id="route" title="Route" badge={slow && <span className="badge">Recalculating…</span>}>
 
       <div className="segmented" role="radiogroup" aria-label="Algorithm">
         {ALGORITHMS.map((a) => (
@@ -139,7 +137,7 @@ export function RouteSummary() {
           Replay
         </button>
       </div>
-    </section>
+    </Panel>
   );
 }
 

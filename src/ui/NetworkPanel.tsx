@@ -6,6 +6,7 @@
 
 import { useMapStore } from '../state/mapStore';
 import { useRouteStore } from '../state/routeStore';
+import { Panel } from './Panel';
 
 export function NetworkPanel() {
   const network = useRouteStore((s) => s.network);
@@ -13,10 +14,9 @@ export function NetworkPanel() {
 
   if (!network) {
     return (
-      <section className="panel">
-        <h2>Network</h2>
+      <Panel id="network" title="Network">
         <p className="muted">Analysing…</p>
-      </section>
+      </Panel>
     );
   }
 
@@ -25,10 +25,7 @@ export function NetworkPanel() {
   const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`;
 
   return (
-    <section className="panel">
-      <h2>
-        Network{stale && <span className="badge">Updating…</span>}
-      </h2>
+    <Panel id="network" title="Network" badge={stale && <span className="badge">Updating…</span>}>
       {usable === 0 ? (
         <p className="muted">No usable intersections.</p>
       ) : connected ? (
@@ -48,6 +45,6 @@ export function NetworkPanel() {
       )}
       {blocked > 0 && <p className="muted small">{plural(blocked, 'intersection')} blocked by obstacles.</p>}
       <p className="muted small">Direction is ignored here; one-way roads can still make a region one-way only.</p>
-    </section>
+    </Panel>
   );
 }

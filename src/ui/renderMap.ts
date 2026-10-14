@@ -43,6 +43,8 @@ export interface RenderOverlay {
   drag: { id: string; x: number; y: number } | null;
   /** Alternative routes (not the main one), drawn dashed under the main route. */
   alternatives: readonly AlternativeLayer[];
+  /** An intersection just found or focused: an expanding ring, `t` running 0..1. */
+  pulse: { id: string; t: number } | null;
 }
 
 export interface AlternativeLayer {
@@ -302,6 +304,8 @@ export function renderMap(ctx: CanvasRenderingContext2D, v: Viewport, dpr: numbe
     }
   }
   for (const n of labelledNodes) haloText(ctx, n.label as string, sx(n.x), sy(n.y) - radius - 10);
+
+  if (overlay.pulse) drawPulse(ctx, s.nodes.get(overlay.pulse.id), overlay.pulse.t, sx, sy, radius);
 
   // ---- Waypoint and start / end pins (constant screen size, drawn last) ----
   s.waypoints.forEach((id, i) => drawPin(ctx, s.nodes.get(id), sx, sy, ROUTE_COLORS.waypoint, String(i + 1)));
@@ -706,5 +710,29 @@ function drawTurnBans(
   ctx.strokeStyle = ROUTE_COLORS.turnBan;
   ctx.stroke(arcs);
   ctx.stroke(bars);
+  ctx.restore();
+}
+
+/** Two expanding, fading rings around a focused intersection. */
+function drawPulse(
+  ctx: CanvasRenderingContext2D,
+  n: GraphNode | undefined,
+  t: number,
+  sx: (x: number) => number,
+  sy: (y: number) => number,
+  radius: number,
+): void {
+  if (!n) return;
+  ctx.save();
+  ctx.strokeStyle = CANVAS_COLORS.accent;
+  for (const offset of [0, 0.35]) {
+    const k = t - offset;
+    if (k <= 0 || k >= 1) continue;
+    ctx.globalAlpha = 1 - k;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(sx(n.x), sy(n.y), radius + 6 + k * 34, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.restore();
 }

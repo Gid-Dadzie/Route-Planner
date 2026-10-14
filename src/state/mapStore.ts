@@ -61,6 +61,13 @@ export interface MapExtras {
 
 export type Selection = { kind: 'node'; id: string } | { kind: 'edge'; id: string };
 
+/** Something the canvas should bring into view. */
+export type FocusTarget =
+  /** Centre on an intersection (zooming in if far out) and pulse it. */
+  | { type: 'node'; id: string }
+  /** Frame the current route with its pins and stops. */
+  | { type: 'route' };
+
 export interface MapState {
   // --- Network ---
   nodes: ReadonlyMap<string, GraphNode>;
@@ -85,6 +92,8 @@ export interface MapState {
   structureVersion: number;
   /** Incremented to ask the canvas to fit the whole map in view. */
   fitRequest: number;
+  /** Latest request to bring something into view; `seq` increases with each request. */
+  focusRequest: { seq: number; target: FocusTarget } | null;
 
   // --- Id counters ---
   nextNodeNum: number;
@@ -97,6 +106,7 @@ export interface MapState {
   setPendingRoadFrom(nodeId: string | null): void;
   toggleLabels(): void;
   requestFit(): void;
+  requestFocus(target: FocusTarget): void;
 
   // --- Map mutations ---
   /** Adds an intersection and returns its id. */
@@ -246,6 +256,7 @@ export function createMapStore(initial: RoadNetwork = { nodes: [], edges: [] }, 
       version: 0,
       structureVersion: 0,
       fitRequest: 0,
+      focusRequest: null,
 
       setTool: (tool) => set({ tool, pendingRoadFrom: null }),
       setTrafficBrush: (level) => set({ trafficBrush: level }),
@@ -253,6 +264,7 @@ export function createMapStore(initial: RoadNetwork = { nodes: [], edges: [] }, 
       setPendingRoadFrom: (pendingRoadFrom) => set({ pendingRoadFrom }),
       toggleLabels: () => set({ showLabels: !get().showLabels }),
       requestFit: () => set({ fitRequest: get().fitRequest + 1 }),
+      requestFocus: (target) => set({ focusRequest: { seq: (get().focusRequest?.seq ?? 0) + 1, target } }),
 
       addNode: (x, y) => {
         const s = get();
