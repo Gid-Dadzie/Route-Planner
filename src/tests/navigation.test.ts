@@ -3,6 +3,18 @@ import type { GraphNode } from '../core/graph';
 import { createMapStore } from '../state/mapStore';
 import { boundsOf, centerOn, panBy, pinchStep, screenToWorld, zoomCentered, type Viewport } from '../ui/viewport';
 import { findIntersections } from '../utils/findIntersections';
+import {
+  clampComparison,
+  clampSidebar,
+  COMPARISON_MIN,
+  MAP_MIN_HEIGHT,
+  MAP_MIN_WIDTH,
+  RESIZE_STEP,
+  SIDEBAR_DEFAULT,
+  SIDEBAR_MIN,
+  stepComparison,
+  stepSidebar,
+} from '../ui/workspace';
 
 const view = (): Viewport => ({ scale: 1, ox: 0, oy: 0, width: 800, height: 600 });
 const worldToScreen = (v: Viewport, x: number, y: number) => ({ x: x * v.scale + v.ox, y: y * v.scale + v.oy });
@@ -91,5 +103,41 @@ describe('mapStore.requestFocus', () => {
     expect(store.getState().focusRequest).toEqual({ seq: 2, target: { type: 'node', id: 'a' } });
     store.getState().requestFocus({ type: 'route' });
     expect(store.getState().focusRequest?.seq).toBe(3);
+  });
+});
+
+describe('resizable workspace', () => {
+  it('clamps the side panel between its minimum and leaving the map room', () => {
+    expect(clampSidebar(100, 1400)).toBe(SIDEBAR_MIN);
+    expect(clampSidebar(500, 1400)).toBe(500);
+    expect(clampSidebar(5000, 1400)).toBe(1400 - MAP_MIN_WIDTH);
+    expect(clampSidebar(400, 300)).toBe(SIDEBAR_MIN); // tiny window: minimum wins
+  });
+
+  it('◀ widens, ▶ narrows, and ▶ at the minimum hides; ◀ restores the old width', () => {
+    let s = { open: true, width: SIDEBAR_DEFAULT };
+    s = stepSidebar(s, 'grow', 1400);
+    expect(s).toEqual({ open: true, width: SIDEBAR_DEFAULT + RESIZE_STEP });
+    s = stepSidebar(stepSidebar(s, 'shrink', 1400), 'shrink', 1400);
+    expect(s).toEqual({ open: true, width: SIDEBAR_MIN });
+    s = stepSidebar(s, 'shrink', 1400);
+    expect(s).toEqual({ open: false, width: SIDEBAR_MIN });
+    expect(stepSidebar(s, 'shrink', 1400)).toBe(s); // already hidden
+    expect(stepSidebar(s, 'grow', 1400)).toEqual({ open: true, width: SIDEBAR_MIN });
+  });
+
+  it('▲ grows the comparison from its measured height, ▼ shrinks and folds it at the minimum', () => {
+    let c: { open: boolean; height: number | null } = { open: true, height: null };
+    c = stepComparison(c, 'grow', 260, 800);
+    expect(c).toEqual({ open: true, height: 260 + RESIZE_STEP });
+    c = stepComparison(c, 'grow', 0, 400); // cannot squeeze the map below its minimum
+    expect(c.height).toBe(400 - MAP_MIN_HEIGHT);
+    c = { open: true, height: COMPARISON_MIN + 20 };
+    c = stepComparison(c, 'shrink', 0, 800);
+    expect(c).toEqual({ open: true, height: COMPARISON_MIN });
+    c = stepComparison(c, 'shrink', 0, 800);
+    expect(c).toEqual({ open: false, height: COMPARISON_MIN });
+    expect(stepComparison(c, 'grow', 0, 800)).toEqual({ open: true, height: COMPARISON_MIN });
+    expect(clampComparison(50, 800)).toBe(COMPARISON_MIN);
   });
 });

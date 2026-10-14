@@ -30,6 +30,8 @@ export function ComparisonPanel() {
   const version = useMapStore((s) => s.version);
   const r = routeStore.getState();
   const open = useUiStore((s) => s.comparisonOpen);
+  const height = useUiStore((s) => s.comparisonHeight);
+  const sized = open && height !== null;
 
   const results = comparison?.results ?? [];
   const agreement = checkAgreement(results);
@@ -45,7 +47,7 @@ export function ComparisonPanel() {
   };
 
   return (
-    <section className={`comparison${open ? '' : ' collapsed'}`} aria-labelledby="comparison-title">
+    <section className={`comparison${open ? '' : ' collapsed'}${sized ? ' sized' : ''}`} style={sized ? { height } : undefined} aria-labelledby="comparison-title">
       <div className="comparison-head">
         <h2 id="comparison-title">
           <button className="panel-toggle" aria-expanded={open} aria-controls="comparison-body" onClick={uiStore.getState().toggleComparison} title="Show or hide the comparison table">

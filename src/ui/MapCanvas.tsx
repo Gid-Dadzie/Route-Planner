@@ -421,7 +421,7 @@ export function MapCanvas() {
 
     // Keyboard navigation. Tool shortcuts live in the toolbar; these move the view.
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
       const step = PAN_STEP_PX * (e.shiftKey ? 3 : 1);
       const v = viewRef.current;
       switch (e.key) {

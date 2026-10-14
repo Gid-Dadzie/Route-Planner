@@ -1237,3 +1237,210 @@ button:disabled {
     height: 44px;
   }
 }
+
+/* ---- Resizable workspace (handles on the map's right and bottom edges) ----- */
+
+.resizer {
+  position: absolute;
+  z-index: 3;
+  outline: none;
+}
+
+.resizer-x {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.resizer-y {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  cursor: row-resize;
+}
+
+.resizer.closed {
+  cursor: default;
+}
+
+/* The edge line lights up on hover, while dragging and when focused. */
+.resizer::after {
+  content: '';
+  position: absolute;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.resizer-x::after {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 3px;
+}
+
+.resizer-y::after {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+}
+
+.resizer:not(.closed):hover::after,
+.resizer:focus-visible::after,
+body.resizing-x .resizer-x::after,
+body.resizing-y .resizer-y::after {
+  opacity: 0.8;
+}
+
+.resize-handle {
+  position: absolute;
+  display: flex;
+  border: 1px solid #3a4a6b;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(17, 26, 46, 0.94);
+  cursor: default;
+}
+
+.resize-handle.vertical {
+  flex-direction: column;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.resize-handle.horizontal {
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.resize-arrow {
+  display: grid;
+  place-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.resize-handle.vertical .resize-arrow + .resize-arrow {
+  border-top: 1px solid var(--border);
+}
+
+.resize-handle.horizontal .resize-arrow + .resize-arrow {
+  border-left: 1px solid var(--border);
+}
+
+.resize-arrow:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.resizer:focus-visible .resize-handle {
+  border-color: var(--accent);
+}
+
+/* While dragging: keep the resize cursor everywhere and stop text selection. */
+body.resizing-x,
+body.resizing-x * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+body.resizing-y,
+body.resizing-y * {
+  cursor: row-resize !important;
+  user-select: none;
+}
+
+/* A fixed-height comparison table scrolls, with its header kept in view. */
+.comparison.sized {
+  overflow-y: auto;
+}
+
+.comparison.sized .comparison-head {
+  position: sticky;
+  top: -12px;
+  z-index: 1;
+  margin-top: -12px;
+  padding-top: 12px;
+  padding-bottom: 8px;
+  background: var(--surface);
+}
+
+/* Keep map overlays clear of the handles. */
+.map-controls {
+  right: 18px;
+  bottom: 18px;
+}
+
+.map-hint {
+  bottom: 18px;
+  max-width: calc(50% - 60px);
+}
+
+/* Phones: panels stack under the map, so there is nothing to resize. */
+@media (max-width: 900px) {
+  .resizer {
+    display: none;
+  }
+  .comparison.sized {
+    height: auto !important;
+    overflow: visible;
+  }
+}
+
+@media (pointer: coarse) {
+  .resize-arrow {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* A narrow side panel squeezes its segmented controls instead of scrolling sideways. */
+.sidebar {
+  overflow-x: hidden;
+}
+
+.segmented button {
+  min-width: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+
+/* When the side panel is narrow, the four algorithm buttons go 2 x 2. */
+.sidebar {
+  container-type: inline-size;
+}
+
+@container (max-width: 340px) {
+  .segmented[aria-label='Algorithm'] {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .segmented[aria-label='Algorithm'] button:nth-child(2n) {
+    border-right: 0;
+  }
+  .segmented[aria-label='Algorithm'] button:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+/* Fields never grow wider than their panel; the generator's size/seed row wraps. */
+.field {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.inline-fields {
+  flex-wrap: wrap;
+}
